@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-exe', '--executable', type=str, default=os.path.abspath(os.path.join(os.getenv("HOME"), "Apps/fsds-v2.0.0-linux/FSDS.sh")), help='Path to Airshim.sh')
 parser.add_argument('-t', '--track', type=str, default='TrainingMap', help='Track name')
 parser.add_argument('-r', '--render', type=int, default=10, help='Render every r frames')
+parser.add_argument('-a', '--autonomous', action='store_true', help='autonomous driving')
 parser.add_argument('-s', '--settings', type=str, default=os.path.abspath(os.path.join(os.getenv("HOME"), "VRE_PATH_PLANNER/settings.json")), help='Path to Airshim settings.json')
 args = parser.parse_args()
 
@@ -72,16 +73,18 @@ def main_control_loop():
     client = fsds.FSDSClient()
     client.confirmConnection()
     #client.reset()
-    client.enableApiControl(True)
+    client.enableApiControl(args.autonomous)
     print("API Control enabled: %s" % client.isApiControlEnabled())
 
-    fsds_car = Env(client, local_checkpoint_radius=6)
+    fsds_car = Env(client, local_checkpoint_radius=8)
     fsds_car.step()
 
     DrivingPolicy.initialise_pid(fsds_car=fsds_car)
     t_plotter = TrackPlot(fsds_car.referee_state)
 
     frame_count = 0
+
+    accel_2d_history = {'x': [], 'y': []}
 
     while True:
 
@@ -91,17 +94,31 @@ def main_control_loop():
         throttle = DrivingPolicy.calculate_throttle(fsds_car=fsds_car, target_speed=target_speed, steering_angle=steering)
         brake = DrivingPolicy.calculate_brake(fsds_car=fsds_car, target_speed=target_speed, steering_angle=steering)
 
-        fsds_car.step(steering, throttle, brake)
+        if not args.autonomous:
+            fsds_car.step()
+        else:
+            fsds_car.step(steering, throttle, brake)
 
-        fsds_car.car_x = fsds_car.vehicle_pose['position']['x_val']*100 + fsds_car.referee_state.initial_position.x # fsds_car.car_state.kinematics_estimated.position.x_val + 
-        fsds_car.car_y = -fsds_car.vehicle_pose['position']['y_val']*100 + fsds_car.referee_state.initial_position.y # fsds_car.car_state.kinematics_estimated.position.y_val + 
-        t_plotter.update_car_position(fsds_car.car_x, fsds_car.car_y, fsds_car.cones)
+        fsds_car.car_x = fsds_car.vehicle_pose['position']['x_val']*100 + fsds_car.referee_state.initial_position.x 
+        fsds_car.car_y = -fsds_car.vehicle_pose['position']['y_val']*100 + fsds_car.referee_state.initial_position.y
+        
+        accel_x = fsds_car.car_state.kinematics_estimated.linear_acceleration.x_val
+        accel_y = fsds_car.car_state.kinematics_estimated.linear_acceleration.y_val
+        accel_z = fsds_car.car_state.kinematics_estimated.linear_acceleration.z_val
+        accel_2d = {'x':accel_y, 'y':accel_x}
+        accel_2d_history['x'].append(accel_y)
+        accel_2d_history['y'].append(accel_x)
+        
+        if len(accel_2d_history['x']) > 5:
+            accel_2d_history['x'].pop(0)
+            accel_2d_history['y'].pop(0)
 
         # TODO Make render an async call
-        if frame_count % args.render==0:
-            fsds_car.simPause(True)
-            t_plotter.render(fsds_car.referee_state, fsds_car.local_checkpoints, fsds_car.fitted_curve)
-            fsds_car.simPause(False)
+        if frame_count % args.render==0 or not args.autonomous:
+            if args.autonomous: fsds_car.simPause(True)
+            t_plotter.update_car_position(fsds_car.car_x, fsds_car.car_y, fsds_car.cones)
+            t_plotter.render(fsds_car.referee_state, fsds_car.local_checkpoints, fsds_car.fitted_curve, accel_2d_history)
+            if args.autonomous: fsds_car.simPause(False)
 
         frame_count+=1
 

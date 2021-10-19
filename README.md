@@ -22,6 +22,8 @@ source ~/fsds/bin/activate
 
 ## Running the demo
 
+<img src=imgs/live_graph.gif>
+
 ```bash
 python main.py
 ```

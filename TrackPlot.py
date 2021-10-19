@@ -41,7 +41,7 @@ class TrackPlot:
         self.car_pos = dict()
         # print(self.rs)
 
-    def render(self, RefereeState, local_checkpoints, fitted_curve):
+    def render(self, RefereeState, local_checkpoints, fitted_curve, accel_2d):
         self.rs = RefereeState
         self.compute()
         global ax1, ax2, ax3, ax4, ax5
@@ -54,6 +54,14 @@ class TrackPlot:
 
         ax2.set_aspect('equal', adjustable='box')
         ax2.cla()
+
+        ax3.set_aspect('equal', adjustable='box')
+        ax3.cla()
+
+        ax3.plot(0, 0, "o", color="g")
+        ax3.plot(accel_2d['x'], accel_2d['y'], color="r")
+        ax3.set_xlim([-10, 10])
+        ax3.set_ylim([-10, 10])
 
         # plt.clf()
         for c in self.cones:
@@ -72,13 +80,13 @@ class TrackPlot:
         #    local_checkpoints['y'].append(cp['y'])
 
         ax2.plot(0, 0, "o", color="red")
-        ax2.set_xlim([-10, 4000])
-        ax2.set_ylim([-1000, 1000])
+        ax2.set_xlim([-4000, 4000])
+        ax2.set_ylim([-4000, 4000])
         
         ax2.plot(local_checkpoints["x"], local_checkpoints["y"], "o", color='blue')
         ax2.plot(fitted_curve["x"], fitted_curve["y"], "-", color='green')
 
-        plt.draw()
+        #plt.draw()
         plt.pause(0.001)
         pass
     
