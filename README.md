@@ -22,7 +22,7 @@ source ~/fsds/bin/activate
 
 ## Running the demo
 
-<img src=imgs/live_graph.gif>
+<img width=400 src=imgs/live_graph.png>
 
 ```bash
 python main.py
